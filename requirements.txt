@@ -3,4 +3,5 @@ flask-session
 google-generativeai
 PyPDF2
 python-docx
+gunicorn
 fpdf
