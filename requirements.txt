@@ -1,7 +1,6 @@
 flask
-flask-session
 google-generativeai
 PyPDF2
 python-docx
+reportlab
 gunicorn
-fpdf
