@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Resume Analyzer</title>
+
+  <style>
+
+    .section {
+      display: none;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 55px;
+      background: #2f3542;
+      color: white;
+      display: flex;
+      align-items: center;
+      padding: 0 15px;
+      z-index: 1000;
+    }
+
+    .menu-btn {
+      font-size: 26px;
+      cursor: pointer;
+      margin-right: 15px;
+    }
+
+    .top-title {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 220px;
+      background: #2f3542;
+      color: white;
+      height: 100vh;
+      padding: 20px;
+      position: fixed;
+      top: 55px;
+      left: 0;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar.hidden {
+      transform: translateX(-100%);
+    }
+    /* MAIN */
+    .main {
+      margin-left: 240px;
+      padding: 80px 30px;
+      width: 100%;
+    }
+
+
+    /* MOBILE */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+
+      .main {
+        margin-left: 0;
+      }
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f6f8;
+    }
+
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .sidebar a {
+      display: block;
+      color: #dcdde1;
+      text-decoration: none;
+      padding: 12px;
+      border-radius: 5px;
+      margin-bottom: 8px;
+    }
+
+    .sidebar a:hover,
+    .sidebar a.active {
+      background: #4CAF50;
+      color: white;
+    }
+
+
+    .container {
+      max-width: 850px;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .upload-box {
+      border: 2px dashed #4CAF50;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      background: #f9fff9;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #4CAF50;
+      border: none;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    .loader {
+      display: none;
+      margin-top: 15px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #ddd;
+      border-top: 4px solid #4CAF50;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* TABS */
+    .tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 2px solid #ddd;
+      margin: 30px 0 15px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      font-weight: 600;
+      color: #555;
+      border-bottom: 3px solid transparent;
+    }
+
+    .tab-btn.active {
+      color: #4CAF50;
+      border-bottom: 3px solid #4CAF50;
+    }
+
+    .tab-content {
+      display: none;
+      margin-top: 15px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .result-box {
+      background:#e8f5e9;
+      padding:15px;
+      border-left:5px solid #4CAF50;
+      border-radius:5px;
+    }
+
+    table {
+      width:100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding:10px;
+      text-align:center;
+      border-bottom:1px solid #ddd;
+    }
+
+    th {
+      background:#2f3542;
+      color:white;
+    }
+
+    /* BADGES */
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .badge-green { background: #2ecc71; }
+    .badge-orange { background: #f39c12; }
+    .badge-red { background: #e74c3c; }
+
+    .tag {
+      display: inline-block;
+      background: #eef2f7;
+      padding: 6px 10px;
+      margin: 4px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .section-card {
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 15px 18px;
+      margin-top: 15px;
+    }
+
+    .section-card h3 {
+      margin-top: 0;
+      color: #2f3542;
+    }
+
+    .result-box {
+      background: #e8f5e9;
+      padding: 15px;
+      border-left: 5px solid #4CAF50;
+      border-radius: 5px;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Make Analyze History tab wider */
+    #historyTab {
+      width: 100%;
+    }
+
+    #historyTab table {
+      width: 100%;
+    }
+
+
+  </style>
+</head>
+
+<body>
+<!-- TOP BAR -->
+<div class="topbar">
+  <span class="menu-btn" onclick="toggleSidebar()">☰</span>
+  <span class="top-title">AI Resume Analyzer</span>
+</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <h2>AI Resume</h2>
+  <a href="#" data-section="dashboard" onclick="showSection('dashboard', this)">Dashboard</a>
+  <a href="#" data-section="analyze" onclick="showSection('analyze', this)">Analyze</a>
+  <a href="#" data-section="history" onclick="showSection('history', this)">History</a>
+  <a href="#" data-section="about" onclick="showSection('about', this)">About</a>
+  <a href="#" data-section="contact" onclick="showSection('contact', this)">Contact</a>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+  <div class="container">
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="section" style="display:block;">
+      <h1>Dashboard</h1>
+      <p>Welcome to AI Resume Analyzer 👋</p>
+
+      <div class="section-card">
+        <h3>What you can do here</h3>
+        <ul>
+          <li>Analyze your resume with ATS scoring</li>
+          <li>See keyword match</li>
+          <li>Get AI feedback</li>
+          <li>Download PDF report</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ANALYZE -->
+    <div id="analyze" class="section" style="display:none;">
+      <h1>AI Resume Analyzer</h1>
+
+    {% if company and job_role %}
+    <p style="text-align:center;color:#4CAF50;font-weight:600;">
+      Company: {{ company }} &nbsp; | &nbsp; Role: {{ job_role }}
+    </p>
+    {% endif %}
+
+    <p style="text-align:center;color:#555;">
+      Upload your resume and get instant ATS scoring & feedback.
+    </p>
+    
+    {% if error %}
+      <div style="background:#ffe0e0;color:#b00020;padding:10px;border-radius:5px;margin-bottom:15px;">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <form action="/analyze" method="POST" enctype="multipart/form-data" onsubmit="showLoader()">
+      <!-- COMPANY SELECTION -->
+      <div style="margin-bottom:20px;">
+        <label style="font-weight:600;">Select Company</label><br><br>
+        <select name="company" class="form-control">
+          <option value="">-- Select Company --</option>
+          <option>Google</option>
+          <option>Microsoft</option>
+          <option>Amazon</option>
+          <option>Meta</option>
+          <option>Apple</option>
+          <option>Tesla</option>
+          <option>Netflix</option>
+          <option>Adobe</option>
+          <option>IBM</option>
+          <option>Intel</option>
+        </select>
+
+        <p style="text-align:center;margin:10px 0;color:#777;">OR</p>
+
+        <input
+          type="text"
+          name="custom_company"
+          placeholder="Type company manually (e.g. OpenAI, Infosys)"
+          class="form-control"
+        />
+      </div>
+
+      <!-- JOB ROLE SELECTION -->
+      <div style="margin-bottom:20px;">
+        <label style="font-weight:600;">Select Job Role</label><br><br>
+        <select name="job_role" id="jobRoleSelect" class="form-control">
+          <option value="">-- Select Job Role --</option>
+        </select>
+
+        <p style="text-align:center;margin:10px 0;color:#777;">OR</p>
+
+        <input
+          type="text"
+          name="custom_job_role"
+          placeholder="Type your own job role (e.g., AI Engineer)"
+          class="form-control"
+        />
+      </div>
+
+      <div class="upload-box">
+        <input type="file" name="resume" accept=".pdf,.docx" required>
+        <p>Upload your resume (PDF or DOCX)</p>
+      </div>
+
+      <button id="analyzeBtn" type="submit">Analyze Resume</button>
+
+      <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <p>Analyzing your resume...</p>
+      </div>
+    </form>
+
+    {% if score is not none %}
+    <form action="/download_pdf" method="POST" style="margin-bottom:15px;">
+      <input type="hidden" name="score" value="{{ score }}">
+      <input type="hidden" name="company" value="{{ company }}">
+      <input type="hidden" name="job_role" value="{{ job_role }}">
+      <input type="hidden" name="strengths" value="{{ strengths | join('\n') }}">
+      <input type="hidden" name="improvements" value="{{ improvements | join('\n') }}">
+      <input type="hidden" name="feedback" value="{{ feedback }}">
+      <button type="submit" style="background:#0984e3;">Download Report as PDF</button>
+    </form>
+    {% endif %}
+
+    <div class="tabs">
+      {% if score is not none %}
+        <button class="tab-btn" onclick="openTab(event,'keywordsTab')">Keywords</button>
+        <button class="tab-btn active" onclick="openTab(event,'scoreTab')">Score</button>
+        <button class="tab-btn" onclick="openTab(event,'strengthsTab')">Strengths</button>
+        <button class="tab-btn" onclick="openTab(event,'improvementsTab')">Improvements</button>
+        <button class="tab-btn" onclick="openTab(event,'feedbackTab')">Feedback</button>
+        <button class="tab-btn" onclick="openTab(event,'historyTab')">History</button>
+
+        <div id="historyTab" class="tab-content">
+          <h3>Previous Analyses</h3>
+
+          {% if history and history|length > 0 %}
+            <table>
+              <tr>
+                <th>File</th>
+                <th>Company</th>
+                <th>Role</th>
+                <th>Score</th>
+                <th>Time</th>
+              </tr>
+
+              {% for item in history %}
+              <tr>
+                <td>{{ item.filename }}</td>
+                <td>{{ item.company }}</td>
+                <td>{{ item.job_role }}</td>
+                <td>{{ item.score }}%</td>
+                <td>{{ item.time }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          {% else %}
+            <p style="color:#777;">No history yet.</p>
+          {% endif %}
+        </div>
+
+      {% endif %}
+    </div>
+
+    {% if score is not none %}
+
+    <div id="scoreTab" class="tab-content active">
+      <h3>ATS Score</h3>
+
+        <div style="
+        background:#ddd;
+        border-radius:12px;
+        overflow:hidden;
+        height: 28px;
+        margin-top: 10px;
+      ">
+      <div style="
+        width: {{ score }}%;
+        height: 100%;
+        background:{% if score is not none and score < 40 %}#e74c3c{% elif score is not none and score < 70 %}#f39c12{% else %}#2ecc71{% endif %};
+        color:white;
+        font-weight:600;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        transition: width 1s ease-in-out;
+      ">
+        {{ score }}%
+      </div>
+    </div>
+  </div>
+
+
+    <div id="strengthsTab" class="tab-content">
+      <div class="section-card">
+        <ul>
+          {% for s in strengths %}
+            <li>{{ s | safe }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div id="improvementsTab" class="tab-content">
+      <div class="section-card">
+        <ul>
+          {% for i in improvements %}
+            <li>{{ i | safe }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div id="feedbackTab" class="tab-content">
+      <div class="section-card">
+        <div class="result-box">{{ feedback | safe }}</div>
+      </div>
+    </div>
+
+    <div id="keywordsTab" class="tab-content">
+      <h3>Keyword Match: {{ match_percent }}%</h3>
+
+      <div style="background:#ddd;border-radius:10px;overflow:hidden;margin-bottom:15px;">
+        <div style="
+          width: {{ match_percent }}%;
+          background:#0984e3;
+          color:white;
+          padding:8px;
+          text-align:center;
+          font-weight:600;">
+          {{ match_percent }}%
+        </div>
+      </div>
+
+      <h4>✅ Matched Keywords</h4>
+      <div>
+        {% for kw in found_keywords %}
+          <span style="display:inline-block;background:#2ecc71;color:white;padding:6px 10px;border-radius:20px;margin:5px;">
+            {{ kw }}
+          </span>
+        {% endfor %}
+      </div>
+
+      <h4 style="margin-top:15px;">❌ Missing Keywords</h4>
+      <div>
+        {% for kw in missing_keywords %}
+          <span style="display:inline-block;background:#e74c3c;color:white;padding:6px 10px;border-radius:20px;margin:5px;">
+            {{ kw }}
+          </span>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% endif %}
+
+    </div>
+
+
+    <!-- HISTORY -->
+
+    <div id="history" class="section" style="display:none;">
+      <h1>History</h1>
+
+      {% if history and history|length > 0 %}
+        <table>
+          <tr>
+            <th>File</th>
+            <th>Company</th>
+            <th>Role</th>
+            <th>Score</th>
+            <th>Time</th>
+          </tr>
+
+          {% for item in history %}
+          <tr>
+            <td>{{ item.filename }}</td>
+            <td>{{ item.company }}</td>
+            <td>{{ item.job_role }}</td>
+            <td>{{ item.score }}%</td>
+            <td>{{ item.time }}</td>
+          </tr>
+          {% endfor %}
+       </table>
+      {% else %}
+        <p style="text-align:center;color:#777;margin-top:20px;">
+          No history yet. Analyze a resume to see results here.
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- ABOUT -->
+
+    <div id="about" class="section" style="display:none;">
+      <h1>About</h1>
+
+      <div class="section-card">
+        <p>
+          AI Resume Analyzer is a smart web application that analyzes resumes using
+          ATS-style scoring, keyword matching, and AI-powered feedback.
+        </p>
+
+        <h3>Technologies Used</h3>
+        <ul>
+          <li>Frontend: HTML, CSS, JavaScript</li>
+          <li>Backend: Python (Flask)</li>
+          <li>AI Model: Gemini API</li>
+          <li>Session Handling: Flask Sessions</li>
+          <li>File Handling: PDF & DOCX parsing</li>
+          <li>Report Generation: PDF Export</li>
+        </ul>
+
+         <h3>Features</h3>
+         <ul>
+          <li>ATS score calculation</li>
+          <li>Keyword match analysis</li>
+          <li>Resume strengths & improvements</li>
+          <li>Downloadable PDF report</li>
+          <li>Analysis history tracking</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CONTACT -->
+
+    <div id="contact" class="section" style="display:none;">
+      <h1>Contact</h1>
+
+      <div class="section-card">
+        <p>For support or feedback:</p>
+
+        <ul>
+          <li>Email: jhaaryan7305@gmail.com</li>
+          <li>Developer: Aryan Jha</li>
+          <li>Project: AI Resume Analyzer</li>
+        </ul>
+      </div>
+    </div>
+
+
+  </div>
+</div>
+
+<script>
+function showLoader() {
+  sessionStorage.setItem("activeSection", "analyze"); 
+  document.getElementById("loader").style.display = "block";
+  document.getElementById("analyzeBtn").disabled = true;
+  document.getElementById("analyzeBtn").innerText = "Analyzing...";
+}
+
+function openTab(evt, tabId) {
+  document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(tabId).classList.add("active");
+  evt.currentTarget.classList.add("active");
+}
+</script>
+
+<script>
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("hidden");
+}
+
+function showSection(id, el) {
+  const target = document.getElementById(id);
+  if (!target) return;   // 🔥 prevents blank page
+
+  document.querySelectorAll(".section").forEach(s => s.style.display = "none");
+  target.style.display = "block";
+
+  document.querySelectorAll(".sidebar a").forEach(a => a.classList.remove("active"));
+  if (el) el.classList.add("active");
+
+  sessionStorage.setItem("activeSection", id);
+
+  if (window.innerWidth < 768) {
+    document.getElementById("sidebar").classList.add("hidden");
+  }
+}
+</script>
+
+<script>
+const commonRoles = [
+  "Software Engineer",
+  "Frontend Developer",
+  "Backend Developer",
+  "Full Stack Developer",
+  "Data Analyst",
+  "Data Scientist",
+  "Machine Learning Engineer",
+  "DevOps Engineer",
+  "Cloud Engineer",
+  "UI/UX Designer",
+  "Product Manager",
+  "Business Analyst"
+];
+
+const companyExtraRoles = {
+  Google: ["AI Researcher", "Site Reliability Engineer", "Android Developer"],
+  Microsoft: ["Azure Engineer", "Dynamics 365 Consultant"],
+  Amazon: ["Cloud Solutions Architect", "Operations Manager"],
+  Meta: ["AR/VR Engineer", "Social Media Analyst"],
+  Apple: ["iOS Developer", "Hardware Engineer"],
+  Tesla: ["Autopilot Engineer", "Robotics Engineer"],
+  Netflix: ["Streaming Platform Engineer", "Content Data Analyst"],
+  Adobe: ["Creative Cloud Engineer", "Graphics Engineer"],
+  IBM: ["Mainframe Developer", "Enterprise Architect"],
+  Intel: ["Chip Design Engineer", "Embedded Systems Engineer"]
+};
+
+const companySelect = document.querySelector("select[name='company']");
+const jobRoleSelect = document.getElementById("jobRoleSelect");
+
+function updateJobRoles() {
+  const company = companySelect.value;
+
+  jobRoleSelect.innerHTML = `<option value="">-- Select Job Role --</option>`;
+
+  // Add common roles
+  commonRoles.forEach(role => {
+    const opt = document.createElement("option");
+    opt.value = role;
+    opt.textContent = role;
+    jobRoleSelect.appendChild(opt);
+  });
+
+  // Add extra roles for selected company
+  if (companyExtraRoles[company]) {
+    companyExtraRoles[company].forEach(role => {
+      const opt = document.createElement("option");
+      opt.value = role;
+      opt.textContent = role + " (Special)";
+      jobRoleSelect.appendChild(opt);
+    });
+  }
+}
+
+companySelect.addEventListener("change", updateJobRoles);
+updateJobRoles();
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  let lastSection = sessionStorage.getItem("activeSection");
+
+  if (!lastSection || !document.getElementById(lastSection)) {
+    lastSection = "dashboard";
+  }
+
+  const link = document.querySelector(`.sidebar a[data-section="${lastSection}"]`);
+  showSection(lastSection, link);
+});
+</script>
+
+</body>
+</html>
