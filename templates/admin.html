@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel — AI Resume Analyzer</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; }
+
+    .topbar {
+      background: #2f3542; color: white; padding: 0 24px;
+      height: 54px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar h2 { font-size: 17px; }
+    .topbar a  { color: #dfe6e9; text-decoration: none; font-size: 13px; margin-left: 18px; }
+    .topbar a:hover { color: #4CAF50; }
+
+    .main { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+
+    .stats {
+      display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 28px;
+    }
+    .stat-card {
+      flex: 1; min-width: 160px; background: white;
+      border-radius: 10px; padding: 18px 22px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border-left: 4px solid #4CAF50;
+    }
+    .stat-card h3 { font-size: 26px; color: #2f3542; margin: 0; }
+    .stat-card p  { font-size: 13px; color: #888; margin: 4px 0 0; }
+    .stat-card.blue  { border-color: #0984e3; }
+    .stat-card.red   { border-color: #e74c3c; }
+    .stat-card.orange{ border-color: #f39c12; }
+
+    .section-title {
+      font-size: 16px; font-weight: bold; color: #2f3542;
+      margin: 28px 0 12px; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px;
+    }
+
+    table { width: 100%; border-collapse: collapse; background: white;
+            border-radius: 10px; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    th { background: #2f3542; color: white; padding: 11px 13px;
+         text-align: left; font-size: 13px; }
+    td { padding: 10px 13px; font-size: 13px; border-bottom: 1px solid #f0f0f0;
+         color: #2d3436; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f9f9f9; }
+
+    .badge {
+      display: inline-block; padding: 3px 9px; border-radius: 12px;
+      font-size: 11px; font-weight: 700; color: white;
+    }
+    .badge-admin  { background: #e74c3c; }
+    .badge-user   { background: #0984e3; }
+    .badge-green  { background: #27ae60; }
+    .badge-orange { background: #f39c12; }
+    .badge-red    { background: #e74c3c; }
+
+    .btn-del {
+      background: #e74c3c; color: white; border: none;
+      padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;
+    }
+    .btn-del:hover { background: #c0392b; }
+
+    .search-box {
+      padding: 9px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 13px; width: 260px; outline: none; margin-bottom: 12px;
+    }
+    .search-box:focus { border-color: #4CAF50; }
+
+    .you-badge {
+      font-size: 10px; background: #4CAF50; color: white;
+      padding: 2px 6px; border-radius: 8px; margin-left: 6px;
+    }
+    .empty { text-align:center; color:#aaa; padding: 30px; font-size:14px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h2>🛡️ Admin Panel — AI Resume Analyzer</h2>
+  <div>
+    <a href="/">← Back to App</a>
+    <a href="/logout">Logout</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- STATS ROW -->
+  {% set total_users    = users | length %}
+  {% set total_analyses = all_history | length %}
+  {% set admin_count    = users | selectattr('is_admin') | list | length %}
+
+  <div class="stats">
+    <div class="stat-card">
+      <h3>{{ total_users }}</h3>
+      <p>Total Users</p>
+    </div>
+    <div class="stat-card blue">
+      <h3>{{ total_analyses }}</h3>
+      <p>Total Analyses (last 100)</p>
+    </div>
+    <div class="stat-card red">
+      <h3>{{ admin_count }}</h3>
+      <p>Admin Accounts</p>
+    </div>
+    <div class="stat-card orange">
+      <h3>{{ total_users - admin_count }}</h3>
+      <p>Regular Users</p>
+    </div>
+  </div>
+
+  <!-- USERS TABLE -->
+  <div class="section-title">👥 All Users</div>
+  <input class="search-box" type="text" id="userSearch"
+         placeholder="🔍 Search users by email..." onkeyup="filterTable('userTable','userSearch')">
+
+  {% if users %}
+  <table id="userTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Joined</th>
+        <th>Today's Usage</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td style="color:#aaa;">{{ u.id }}</td>
+        <td>
+          {{ u.email }}
+          {% if u.email == current_user.email %}
+            <span class="you-badge">YOU</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if u.is_admin %}
+            <span class="badge badge-admin">ADMIN</span>
+          {% else %}
+            <span class="badge badge-user">USER</span>
+          {% endif %}
+        </td>
+        <td style="color:#888;">{{ u.created_at[:16] }}</td>
+        <td>
+          {% if u.is_admin %}
+            <span style="color:#888;font-size:12px;">Unlimited</span>
+          {% else %}
+            <span class="badge {% if u.daily_count >= 3 %}badge-red{% elif u.daily_count >= 2 %}badge-orange{% else %}badge-green{% endif %}">
+              {{ u.daily_count }}/3 today
+            </span>
+          {% endif %}
+        </td>
+        <td>
+          {% if not u.is_admin %}
+          <form method="POST" action="/admin/delete_user/{{ u.id }}"
+                onsubmit="return confirm('Delete user {{ u.email }} and all their data?')">
+            <button class="btn-del" type="submit">🗑 Delete</button>
+          </form>
+          {% else %}
+            <span style="color:#aaa;font-size:12px;">Protected</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No users yet.</p>
+  {% endif %}
+
+  <!-- ALL HISTORY TABLE -->
+  <div class="section-title" style="margin-top:36px;">📋 All Analysis History (last 100)</div>
+  <input class="search-box" type="text" id="histSearch"
+         placeholder="🔍 Search by email, company, role..." onkeyup="filterTable('histTable','histSearch')">
+
+  {% if all_history %}
+  <table id="histTable">
+    <thead>
+      <tr>
+        <th>User Email</th>
+        <th>File</th>
+        <th>Company</th>
+        <th>Role</th>
+        <th>Score</th>
+        <th>Must-Have Match</th>
+        <th>Date</th>
+        <th>PDF</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in all_history %}
+      <tr>
+        <td style="font-size:12px;">{{ h.email }}</td>
+        <td style="font-size:12px;color:#888;">{{ h.filename }}</td>
+        <td>{{ h.company }}</td>
+        <td style="font-size:12px;">{{ h.job_role }}</td>
+        <td>
+          <span class="badge {% if h.score >= 70 %}badge-green{% elif h.score >= 40 %}badge-orange{% else %}badge-red{% endif %}">
+            {{ h.score }}%
+          </span>
+        </td>
+        <td>
+          <span class="badge {% if h.must_match_percent >= 70 %}badge-green{% elif h.must_match_percent >= 40 %}badge-orange{% else %}badge-red{% endif %}">
+            {{ h.must_match_percent }}%
+          </span>
+        </td>
+        <td style="font-size:11px;color:#888;">{{ h.created_at[:16] }}</td>
+        <td>
+          <a href="/download_history_pdf/{{ h.id }}"
+             style="background:#0984e3;color:white;padding:4px 10px;border-radius:5px;
+                    text-decoration:none;font-size:12px;">
+            ⬇ PDF
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No analysis history yet.</p>
+  {% endif %}
+
+  <p style="text-align:center;color:#aaa;font-size:12px;margin:30px 0;">
+    AI Resume Analyzer Admin Panel — {{ current_user.email }}
+  </p>
+
+</div><!-- /main -->
+
+<script>
+function filterTable(tableId, inputId) {
+  const filter = document.getElementById(inputId).value.toLowerCase();
+  const rows   = document.getElementById(tableId).querySelectorAll("tbody tr");
+  rows.forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(filter) ? "" : "none";
+  });
+}
+</script>
+
+</body>
+</html>
