@@ -8,3 +8,4 @@ flask-login
 flask-mail
 werkzeug
 itsdangerous
+psycopg2-binary
