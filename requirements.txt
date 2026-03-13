@@ -4,3 +4,7 @@ PyPDF2
 python-docx
 reportlab
 gunicorn
+flask-login
+flask-mail
+werkzeug
+itsdangerous
