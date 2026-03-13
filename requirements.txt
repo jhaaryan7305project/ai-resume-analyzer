@@ -5,7 +5,8 @@ python-docx
 reportlab
 gunicorn
 flask-login
-flask-mail
 werkzeug
 itsdangerous
 psycopg2-binary
+sendgrid
+
