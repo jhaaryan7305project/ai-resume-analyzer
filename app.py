@@ -15,7 +15,8 @@ from flask import send_file, jsonify, redirect, url_for, flash
 import io
 from flask import Flask, render_template, request, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_mail import Mail, Message
+import sendgrid
+from sendgrid.helpers.mail import Mail as SGMail, To
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer
 
@@ -29,20 +30,14 @@ from job_database import (
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fallback_for_local")
 
-# ── Gmail SMTP (works from localhost as long as you have internet) ─────────────
-app.config["MAIL_SERVER"]         = "smtp.gmail.com"
-app.config["MAIL_PORT"]           = 587
-app.config["MAIL_USE_TLS"]        = True
-app.config["MAIL_USE_SSL"]        = False
-app.config["MAIL_USERNAME"]       = "jhaaryan7305@gmail.com"
-app.config["MAIL_PASSWORD"]       = os.environ.get("MAIL_APP_PASSWORD")
-app.config["MAIL_DEFAULT_SENDER"] = ("AI Resume Analyzer", "jhaaryan7305@gmail.com")
+# ── SendGrid email config ──────────────────────────────────────────────────────
+SENDGRID_API_KEY  = os.environ.get("SENDGRID_API_KEY")
+SENDER_EMAIL      = "jhaaryan7305@gmail.com"
 
 ADMIN_EMAIL    = "jhaaryan7305@gmail.com"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 DAILY_LIMIT    = 3
 
-mail       = Mail(app)
 login_mgr  = LoginManager(app)
 login_mgr.login_view = "login_page"
 serializer = URLSafeTimedSerializer(app.secret_key)
@@ -295,10 +290,12 @@ def forgot_password():
             token     = serializer.dumps(email, salt="pw-reset")
             reset_url = url_for("reset_password", token=token, _external=True)
             try:
-                msg = Message(
+                sg  = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
+                msg = SGMail(
+                    from_email=SENDER_EMAIL,
+                    to_emails=email,
                     subject="Reset Your AI Resume Analyzer Password",
-                    recipients=[email],
-                    html=f"""
+                    html_content=f"""
                     <div style="font-family:Arial;max-width:480px;margin:auto;padding:30px;
                                 border:1px solid #eee;border-radius:10px;">
                       <h2 style="color:#2f3542;">🔐 AI Resume Analyzer</h2>
@@ -311,11 +308,11 @@ def forgot_password():
                       </a>
                       <p style="color:#888;font-size:12px;margin-top:20px;">
                         ⏱ This link expires in 30 minutes.<br>
-                        If you didn't request this, just ignore this email.
+                        If you did not request this, just ignore this email.
                       </p>
                     </div>"""
                 )
-                mail.send(msg)
+                sg.send(msg)
                 message = "✅ Password reset link sent! Check your inbox."
             except Exception as e:
                 error = f"Could not send email: {str(e)}"
