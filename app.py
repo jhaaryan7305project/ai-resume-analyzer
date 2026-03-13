@@ -2,7 +2,10 @@ import google.generativeai as genai
 from PyPDF2 import PdfReader
 import docx
 from datetime import datetime, date
-import re, sqlite3, os, secrets
+import re, os, secrets
+import psycopg2
+import psycopg2.errors
+import psycopg2.extras
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib import colors
@@ -51,29 +54,28 @@ model = genai.GenerativeModel(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DATABASE
+# DATABASE  (PostgreSQL)
 # ─────────────────────────────────────────────────────────────────────────────
-DB_PATH = "resume_analyzer.db"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     return conn
 
 def init_db():
     conn = get_db()
     c    = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS users (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        id            SERIAL PRIMARY KEY,
         email         TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         is_admin      INTEGER DEFAULT 0,
-        created_at    TEXT DEFAULT (datetime('now')),
+        created_at    TEXT DEFAULT to_char(now(),'YYYY-MM-DD HH24:MI:SS'),
         daily_count   INTEGER DEFAULT 0,
         last_date     TEXT DEFAULT ''
     )""")
     c.execute("""CREATE TABLE IF NOT EXISTS history (
-        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        id                 SERIAL PRIMARY KEY,
         user_id            INTEGER NOT NULL,
         filename           TEXT,
         company            TEXT,
@@ -89,13 +91,14 @@ def init_db():
         must_match_percent INTEGER,
         match_percent      INTEGER,
         job_description    TEXT,
-        created_at         TEXT DEFAULT (datetime('now')),
+        created_at         TEXT DEFAULT to_char(now(),'YYYY-MM-DD HH24:MI:SS'),
         FOREIGN KEY (user_id) REFERENCES users(id)
     )""")
     conn.commit()
-    existing = c.execute("SELECT id FROM users WHERE email=?", (ADMIN_EMAIL,)).fetchone()
+    c.execute("SELECT id FROM users WHERE email=%s", (ADMIN_EMAIL,))
+    existing = c.fetchone()
     if not existing:
-        c.execute("INSERT INTO users (email,password_hash,is_admin) VALUES (?,?,1)",
+        c.execute("INSERT INTO users (email,password_hash,is_admin) VALUES (%s,%s,1)",
                   (ADMIN_EMAIL, generate_password_hash(ADMIN_PASSWORD)))
         conn.commit()
     conn.close()
@@ -116,7 +119,9 @@ class User(UserMixin):
 @login_mgr.user_loader
 def load_user(user_id):
     conn = get_db()
-    row  = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    c    = conn.cursor()
+    c.execute("SELECT * FROM users WHERE id=%s", (user_id,))
+    row  = c.fetchone()
     conn.close()
     return User(row) if row else None
 
@@ -126,18 +131,22 @@ def load_user(user_id):
 def get_today_count(user_id):
     today = str(date.today())
     conn  = get_db()
-    row   = conn.execute("SELECT daily_count, last_date FROM users WHERE id=?", (user_id,)).fetchone()
+    c     = conn.cursor()
+    c.execute("SELECT daily_count, last_date FROM users WHERE id=%s", (user_id,))
+    row   = c.fetchone()
     conn.close()
     return 0 if row["last_date"] != today else row["daily_count"]
 
 def increment_count(user_id):
     today = str(date.today())
     conn  = get_db()
-    row   = conn.execute("SELECT last_date FROM users WHERE id=?", (user_id,)).fetchone()
+    c     = conn.cursor()
+    c.execute("SELECT last_date FROM users WHERE id=%s", (user_id,))
+    row   = c.fetchone()
     if row["last_date"] != today:
-        conn.execute("UPDATE users SET daily_count=1, last_date=? WHERE id=?", (today, user_id))
+        c.execute("UPDATE users SET daily_count=1, last_date=%s WHERE id=%s", (today, user_id))
     else:
-        conn.execute("UPDATE users SET daily_count=daily_count+1 WHERE id=?", (user_id,))
+        c.execute("UPDATE users SET daily_count=daily_count+1 WHERE id=%s", (user_id,))
     conn.commit()
     conn.close()
 
@@ -189,10 +198,9 @@ def base_ctx():
 
 def get_user_history(user_id):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM history WHERE user_id=? ORDER BY created_at DESC LIMIT 30",
-        (user_id,)
-    ).fetchall()
+    c    = conn.cursor()
+    c.execute("SELECT * FROM history WHERE user_id=%s ORDER BY created_at DESC LIMIT 30", (user_id,))
+    rows = c.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -201,11 +209,12 @@ def save_history(user_id, filename, company, job_role, score,
                  must_found, must_missing, good_found, good_missing,
                  must_match_percent, match_percent, job_description):
     conn = get_db()
-    conn.execute("""INSERT INTO history
+    c    = conn.cursor()
+    c.execute("""INSERT INTO history
         (user_id,filename,company,job_role,score,strengths,improvements,feedback,
          must_found,must_missing,good_found,good_missing,
          must_match_percent,match_percent,job_description)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (user_id,filename,company,job_role,score,
          strengths,improvements,feedback,
          must_found,must_missing,good_found,good_missing,
@@ -225,7 +234,9 @@ def login_page():
         email    = request.form.get("email","").strip().lower()
         password = request.form.get("password","")
         conn = get_db()
-        row  = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        c    = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email=%s", (email,))
+        row  = c.fetchone()
         conn.close()
         if row and check_password_hash(row["password_hash"], password):
             login_user(User(row), remember=True)
@@ -251,14 +262,16 @@ def register():
         else:
             try:
                 conn = get_db()
-                conn.execute("INSERT INTO users (email,password_hash) VALUES (?,?)",
+                c    = conn.cursor()
+                c.execute("INSERT INTO users (email,password_hash) VALUES (%s,%s)",
                              (email, generate_password_hash(password)))
                 conn.commit()
-                row = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+                c.execute("SELECT * FROM users WHERE email=%s", (email,))
+                row  = c.fetchone()
                 conn.close()
                 login_user(User(row), remember=True)
                 return redirect(url_for("home"))
-            except sqlite3.IntegrityError:
+            except psycopg2.errors.UniqueViolation:
                 error = "An account with this email already exists."
     return render_template("login.html", page="register", error=error)
 
@@ -274,7 +287,9 @@ def forgot_password():
     if request.method == "POST":
         email = request.form.get("email","").strip().lower()
         conn  = get_db()
-        user  = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        c     = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email=%s", (email,))
+        user  = c.fetchone()
         conn.close()
         if user:
             token     = serializer.dumps(email, salt="pw-reset")
@@ -325,7 +340,8 @@ def reset_password(token):
             error = "Password must be at least 6 characters."
         else:
             conn = get_db()
-            conn.execute("UPDATE users SET password_hash=? WHERE email=?",
+            c    = conn.cursor()
+            c.execute("UPDATE users SET password_hash=%s WHERE email=%s",
                          (generate_password_hash(password), email))
             conn.commit()
             conn.close()
@@ -498,8 +514,9 @@ def download_pdf():
 @login_required
 def download_history_pdf(hid):
     conn = get_db()
-    row  = conn.execute("SELECT * FROM history WHERE id=? AND user_id=?",
-                        (hid, current_user.id)).fetchone()
+    c    = conn.cursor()
+    c.execute("SELECT * FROM history WHERE id=%s AND user_id=%s", (hid, current_user.id))
+    row  = c.fetchone()
     conn.close()
     if not row: return "Not found", 404
     r = dict(row)
@@ -606,10 +623,11 @@ def admin_panel():
     if not current_user.is_admin:
         return "Access denied.", 403
     conn = get_db()
-    users = conn.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
-    all_history = conn.execute(
-        "SELECT h.*,u.email FROM history h JOIN users u ON h.user_id=u.id ORDER BY h.created_at DESC LIMIT 100"
-    ).fetchall()
+    c    = conn.cursor()
+    c.execute("SELECT * FROM users ORDER BY created_at DESC")
+    users = c.fetchall()
+    c.execute("SELECT h.*,u.email FROM history h JOIN users u ON h.user_id=u.id ORDER BY h.created_at DESC LIMIT 100")
+    all_history = c.fetchall()
     conn.close()
     return render_template("admin.html",
         users=[dict(u) for u in users],
@@ -620,8 +638,9 @@ def admin_panel():
 def delete_user(uid):
     if not current_user.is_admin: return "Access denied.", 403
     conn = get_db()
-    conn.execute("DELETE FROM history WHERE user_id=?", (uid,))
-    conn.execute("DELETE FROM users WHERE id=? AND is_admin=0", (uid,))
+    c    = conn.cursor()
+    c.execute("DELETE FROM history WHERE user_id=%s", (uid,))
+    c.execute("DELETE FROM users WHERE id=%s AND is_admin=0", (uid,))
     conn.commit(); conn.close()
     return redirect(url_for("admin_panel"))
 
